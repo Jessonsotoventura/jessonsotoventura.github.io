@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="https://sotoventura.com/sitemap.xsl"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+<url>
+<loc>https://sotoventura.com/</loc>
+</url>
+<url>
+<loc>https://sotoventura.com/abusing-webviews-to-steal-files-via-email.html</loc>
+<lastmod>2022-07-21T00:29:51-04:00</lastmod>
+<image:image>
+<image:loc>https://sotoventura.com/media/posts/7/webview.svg</image:loc>
+<image:title><![CDATA[]]></image:title>
+</image:image>
+<image:image>
+<image:loc>https://sotoventura.com/images/blogs/webview/alert.png</image:loc>
+<image:title><![CDATA[Alert Message triggered via a malicious email]]></image:title>
+</image:image>
+<image:image>
+<image:loc>https://sotoventura.com/images/blogs/webview/WebView.png</image:loc>
+<image:title><![CDATA[Debugging WebViews using Google Chrome]]></image:title>
+</image:image>
+<image:image>
+<image:loc>https://sotoventura.com/blogs/readfile.png</image:loc>
+<image:title><![CDATA[Example of reading files from the external SD Card]]></image:title>
+</image:image>
+<image:image>
+<image:loc>https://sotoventura.com/images/blogs/webview/readfile.png</image:loc>
+<image:title><![CDATA[Example of reading files from the external SD Card]]></image:title>
+</image:image>
+</url>
+<url>
+<loc>https://sotoventura.com/blogs.html</loc>
+<lastmod>2022-07-12T23:03:26-04:00</lastmod>
+</url>
+<url>
+<loc>https://sotoventura.com/edison-mail-disclosure.html</loc>
+<lastmod>2022-07-21T00:30:09-04:00</lastmod>
+<image:image>
+<image:loc>https://sotoventura.com/media/posts/8/disclosure.jpg</image:loc>
+<image:title><![CDATA[]]></image:title>
+</image:image>
+</url>
+<url>
+<loc>https://sotoventura.com/whoami.html</loc>
+<lastmod>2022-07-21T19:34:35-04:00</lastmod>
+</url>
+</urlset>
