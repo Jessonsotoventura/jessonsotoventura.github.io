@@ -1,0 +1,178 @@
+<!DOCTYPE html><html lang="en-us"><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dumping Keys From the Linux Key Retention Service --- Part 2 - Jesson Soto Ventura</title><meta name="description" content="In the last entry of this series we created a Linux kernel module which was able to dump keys from the Linux Kernel Key Retention Service. The kernel module was limited to only x86_64 machines with a mainline Linux kernel. It also required having the appropriate Linux kernel headers. Access&hellip;"><meta name="generator" content="Publii Open-Source CMS for Static Site"><link rel="canonical" href="https://sotoventura.com/dumping-keys-from-the-linux-key-retention-service-part-2.html"><link rel="alternate" type="application/atom+xml" href="https://sotoventura.com/feed.xml" title="Jesson Soto Ventura - RSS"><link rel="alternate" type="application/json" href="https://sotoventura.com/feed.json" title="Jesson Soto Ventura - JSON"><meta property="og:title" content="Dumping Keys From the Linux Key Retention Service --- Part 2"><meta property="og:site_name" content="Jesson Soto Ventura"><meta property="og:description" content="In the last entry of this series we created a Linux kernel module which was able to dump keys from the Linux Kernel Key Retention Service. The kernel module was limited to only x86_64 machines with a mainline Linux kernel. It also required having the appropriate Linux kernel headers. Access&hellip;"><meta property="og:url" content="https://sotoventura.com/dumping-keys-from-the-linux-key-retention-service-part-2.html"><meta property="og:type" content="article"><link rel="preload" href="https://sotoventura.com/assets/dynamic/fonts/jetbrainsmono/jetbrainsmono.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="https://sotoventura.com/assets/dynamic/fonts/jetbrainsmono/jetbrainsmono-italic.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="https://sotoventura.com/assets/css/style.css?v=b4db674cada6db4202f62f01e26a5d25"><script type="application/ld+json">{"@context":"http://schema.org","@type":"Article","mainEntityOfPage":{"@type":"WebPage","@id":"https://sotoventura.com/dumping-keys-from-the-linux-key-retention-service-part-2.html"},"headline":"Dumping Keys From the Linux Key Retention Service --- Part 2","datePublished":"2024-12-02T00:00-05:00","dateModified":"2025-05-19T20:24-04:00","description":"In the last entry of this series we created a Linux kernel module which was able to dump keys from the Linux Kernel Key Retention Service. The kernel module was limited to only x86_64 machines with a mainline Linux kernel. It also required having the appropriate Linux kernel headers. Access&hellip;","author":{"@type":"Person","name":"Jesson Soto Ventura","url":"https://sotoventura.com/authors/jesson-soto-ventura/"},"publisher":{"@type":"Organization","name":"Jesson Soto Ventura"}}</script><noscript><style>img[loading] {
+                    opacity: 1;
+                }</style></noscript></head><body class="post-template"><div class="container container--center"><header class="header"><div class="header__logo"><a class="logo" href="https://sotoventura.com/">Jesson Soto Ventura</a></div></header><main class="content"><article class="post"><header><h1 class="post__title">Dumping Keys From the Linux Key Retention Service --- Part 2</h1><div class="post__meta"><time datetime="2024-12-02T00:00" class="post__date">December 2, 2024 </time><span class="post__author"><a href="https://sotoventura.com/authors/jesson-soto-ventura/" class="feed__author">Jesson Soto Ventura</a></span></div><div class="post__tags"><a href="https://sotoventura.com/tags/linux-kernel/" class="invert">Linux Kernel</a></div></header><div class="post__entry"><p><a href="https://sotoventura.com/dumping-keys-from-the-linux-key-retention-service-part-1.html">In the last entry of this series</a> we created a Linux kernel module which was able to dump keys from the Linux Kernel Key Retention Service. The kernel module was limited to only x86_64 machines with a mainline Linux kernel. It also required having the appropriate Linux kernel headers. Access to Linux kernel headers is typically not available for embedded systems, making our Linux kernel module useless on most embedded systems. In this blog post, we will fix that by creating a kernel module which will not require any Linux kernel headers. We will also cross-compile the kernel module so that it can run on AArch64 based systems, which tend to be a common architecture for embedded systems.</p><blockquote><p>Copied with ❤️ from <a href="https://research.ivision.com/building-linux-kernel-modules-without-headers-part-2.html">ivision’s research blog</a></p></blockquote><h2 id="getting-set-up">Getting set up</h2><p>If you want to follow along, please download this blog’s resource <a href="/assets/postcontent/headerless_kernel_modules.tar.gz">here</a>. Included in the download are the following two QEMU images:</p><ul><li>QEMU x86_64: Based on Linux Kernel 6.6.32</li><li>QEMU AArch64: Based on Linux kernel 6.6.32</li></ul><p>These two images contain all the tools and resources needed for the blog post. Within each image are the following keys:</p><table><thead><tr><th>Key Type</th><th>Key Name</th><th>Key Value</th></tr></thead><tbody><tr><td>user</td><td>user_key</td><td><code>need pentesting?</code></td></tr><tr><td>logon</td><td>logon_key</td><td><code>contact us at ivision.com</code></td></tr><tr><td>asymmetric x509</td><td>asym_x509</td><td>a public certificate</td></tr><tr><td>asymmetric pkcs #8</td><td>asym_pkcs8</td><td>a private key</td></tr></tbody></table><p>Additionally, the source code for a headerless Linux kernel module is included.</p><h2 id="what-makes-a-linux-kernel-module-valid">What makes a Linux Kernel Module valid</h2><p>Our goal is to create a loadable kernel module without using any kernel headers. To achieve that, we will need to convince the Linux kernel that the module supplied is in fact a valid Linux kernel module. This begs the question: “What steps does the Linux Kernel take to validate a Linux kernel module”? Perhaps, if we are able to understand each of these validity checks we will be able to build our own file that that satisfies these checks. These checks are all implemented in the <a href="https://elixir.bootlin.com/linux/v6.6.32/source/kernel/module/main.c#L1669">elf_validity_cache_copy</a> function. A review of the function indicates that it initially performs the following checks on all to-be-loaded modules:</p><ol><li>Validation of ELF File Type</li><li>Validation of ELF Section Headers</li></ol><p><strong>Note:</strong> These are not all the checks done by Linux Kernel, however, satisfaction of these two checks is typically enough to let us load our own kernel module. Curious about what all the checks are? <a href="https://elixir.bootlin.com/linux/v6.6.32/source/kernel/module/main.c#L2833">Take a look at the load_module function</a></p><h3 id="validation-of-elf-file-type">Validation of ELF File Type</h3><p>The first step in validating a kernel module is validating the kernel module’s file type. A review of the checks performed by the <code>elf_validity_cache_copy</code> method indicates that a Linux kernel module must be an ELF type. Let’s take a closer look at that requirement. The <code>elf_validity_cache_copy</code> function implements the following check:</p><pre><code class="language-c">if (info-&gt;hdr-&gt;e_type != ET_REL) {
+        pr_err(&quot;Invalid ELF header type: %u != %u\n&quot;,
+               info-&gt;hdr-&gt;e_type, ET_REL);
+        goto no_exec;
+    }
+</code></pre><p>This indicates that the ELF type must be of type <code>EL_REL</code> (Relocatable) per the <a href="https://man7.org/linux/man-pages/man5/elf.5.html">elf man page</a>. We can generate ELF relocatable files by using <code>gcc -c</code>. This will create a file, which we can confirm is relocatable via the <code>file</code> command. Actually, let’s make a simple kernel module <code>ivision.c</code> to learn how to meet various Linux kernel module checks.</p><p><strong>Note:</strong> The completed ivision.c file can be found in this blog’s this blog’s resource <a href="/assets/postcontent/headerless_kernel_modules.tar.gz">here</a></p><pre><code class="language-c">int main(){
+  return 0;
+}
+</code></pre><p>Let’s compile <code>ivision.c</code> using <code>gcc -c ivision.c -o ivision.ko</code>. Once created, we can use <code>file</code> to confirm that the resulting file <code>ivision.o</code> is of type <code>ELF ... relocatable</code>.</p><pre><code>$ file ivision.o
+ivision.o: ELF 64-bit LSB relocatable, x86-64, version 1 (SYSV), not stripped
+</code></pre><p>For now step one is complete. We have met the file type condition. Up next, we need to modify the ELF so that it fits the Linux Kernel’s ELF section header expectations.</p><h3 id="validation-of-elf-section-headers">Validation of ELF Section Headers</h3><p>In addition to validating the kernel module is of the correct ELF type, the <code>elf_validity_cache_copy</code> method checks to see if the kernel module contains specific ELF headers. Specifically, it checks for the following section headers:</p><ul><li><code>.modinfo</code></li><li><code>.gnu.linkonce.this_module</code></li><li>Relocation table for startup and deconstruction functions</li><li>For AArch64: <code>.plt</code> and <code>.init.plt</code></li></ul><p>All ELF files have sections. Some sections are pretty standard (<code>.text</code> for code, <code>.data</code> for data, etc.) but there can be unique sections as well (such as the above). These unique sections are referenced and required by the Linux kernel. So let’s take a look at each of these sections:</p><h4 id="elf-section--modinfo">ELF Section — <code>.modinfo</code></h4><p><code>.modinfo</code> is an ELF section containing null-byte separated <code>key=value</code> pairs with module information. Most of the information in this section is not needed, however the following keys/value pairs are important:</p><ul><li><code>name</code>: The name of the module. This is what will be used when log messages are printed in any kernel log entries.</li><li><code>vermagic</code>: A magic value unique per Linux kernel build which is used by the Linux kernel to validate that the module was built against our specific kernel version.</li></ul><p>If we want to build a kernel module, we will need to appropriately populate the <code>.modinfo</code> section. To do that, we need to:</p><ol><li>Identify the correct <code>vermagic</code>.</li><li>Create a new elf section called <code>.modinfo</code>.</li><li>Populate <code>.modinfo</code> with the appropriate keys.</li></ol><p>Let’s start by talking about how to find the <code>vermagic</code>. It is used by the Linux kernel to validate the compatibility of a Linux kernel module, so all Linux kernel modules <strong>must</strong> have the string in their <code>.modinfo</code> section. We can extract the value from an existing Linux kernel module on our test system. Let’s start by finding a suitable module inside our X86_64 QEMU VM:</p><pre><code>$ find / | grep ko
+/lib/modules/6.6.32/kernel/drivers/char/hw_random/via-rng.ko
+/lib/modules/6.6.32/kernel/drivers/char/hw_random/rng-core.ko
+/lib/modules/6.6.32/kernel/drivers/char/hw_random/intel-rng.ko
+/lib/modules/6.6.32/kernel/drivers/char/hw_random/virtio-rng.ko
+/lib/modules/6.6.32/kernel/drivers/char/hw_random/amd-rng.ko
+</code></pre><p>Using <code>amd-rng.ko</code>, we can extract the <code>vermagic</code> by copying <code>amd-rng.ko</code> locally and dumping the contents using <code>readelf</code>.</p><pre><code>$ readelf amd-rng.ko -j .modinfo   
+
+Hex dump of section &#39;.modinfo&#39;:
+  0x00000000 6c696365 6e73653d 47504c00 64657363 license=GPL.desc
+  0x00000010 72697074 696f6e3d 482f5720 524e4720 ription=H/W RNG 
+  0x00000020 64726976 65722066 6f722041 4d442063 driver for AMD c
+  0x00000030 68697073 65747300 61757468 6f723d54 hipsets.author=T
+  0x00000040 6865204c 696e7578 204b6572 6e656c20 he Linux Kernel 
+  0x00000050 7465616d 00616c69 61733d70 63693a76 team.alias=pci:v
+  0x00000060 30303030 31303232 64303030 30373436 00001022d0000746
+  0x00000070 4273762a 73642a62 632a7363 2a692a00 Bsv*sd*bc*sc*i*.
+  0x00000080 616c6961 733d7063 693a7630 30303031 alias=pci:v00001
+  0x00000090 30323264 30303030 37343433 73762a73 022d00007443sv*s
+  0x000000a0 642a6263 2a73632a 692a0064 6570656e d*bc*sc*i*.depen
+  0x000000b0 64733d72 6e672d63 6f726500 72657470 ds=rng-core.retp
+  0x000000c0 6f6c696e 653d5900 696e7472 65653d59 oline=Y.intree=Y
+  0x000000d0 006e616d 653d616d 645f726e 67007665 .name=amd_rng.ve
+  0x000000e0 726d6167 69633d36 2e362e33 3220534d rmagic=6.6.32 SM
+  0x000000f0 50207072 65656d70 74206d6f 645f756e P preempt mod_un
+  0x00000100 6c6f6164 2000                       load .
+</code></pre><p>We could have also used the following:</p><pre><code>$ strings amd-rng.ko | grep vermagic
+vermagic=6.6.32 SMP preempt mod_unload 
+</code></pre><p>But make sure to compare the output of both commands. Kernel module vermagics can have a trailing space. With the value obtained, let’s talk about how to create the new section header. We can achieve that by using <code>gcc</code>‘s compiler attributes. Specifically, we can use the <code>__attribute__((section(&quot;section_name&quot;)))</code> feature to define where certain variables should be located in the ELF header. Let’s update <code>ivision.c</code> to include a <code>.modinfo</code> section which contains a <code>vermagic</code> and <code>name</code> key.</p><pre><code class="language-c">#define NAME &quot;ivision&quot;
+#define VERMAGIC &quot;6.6.32 SMP preempt mod_unload &quot;
+
+char modinfo[]  __attribute__((section(&quot;.modinfo&quot;))) = &quot;name=&quot; NAME &quot;\x00vermagic=&quot; VERMAGIC;
+
+int main(){
+  return 0;
+}
+</code></pre><p><strong>Note:</strong> Once again, we can compile our snippet using <code>gcc -c ivision.c -o ivision.ko</code> and the use <code>readelf ivision.ko -j .modinfo</code> to make sure the <code>vermagic</code> and <code>.modinfo</code> section were created.</p><pre><code>$ readelf amd-rng.ko -j .modinfo   
+
+Hex dump of section &#39;.modinfo&#39;:
+  0x00000000 6e616d65 3d697669 73696f6e 00766572  name=ivision.ver
+  0x00000010 6d616769 633d362e 362e3332 20534d50  magic=6.6.32 SMP
+  0x00000020 20707265 656d7074 206d6f64 5f756e6c   preempt mod_unl
+  0x00000030 6f616420 00000000 00000000 00000000  oad ............
+  0x00000040 00000000 00000000 00000000 00000000  ................
+  0x00000050 00000000 00000000 00000000 00000000  ................
+  0x00000060 00000000                             ....
+</code></pre><h4 id="elf-section--gnulinkoncethis_module">ELF Section — <code>.gnu.linkonce.this_module</code></h4><p><code>.gnu.linkonce.this_module</code> is an ELF section with a pre-defined size (unique for each kernel) that is used to store the initialized <a href="https://elixir.bootlin.com/linux/v6.6.32/source/include/linux/module.h#L402"><code>struct module</code></a>. This section must be exactly the size of a <code>struct module</code>, which varies depending on the Linux kernel configuration. Except for the module name, this section can typically be filled with zeros and left for the kernel to initialize. Similar to <code>.modinfo</code>, we will need to collect kernel specific information from another Linux kernel module to populate <code>.gnu.linkone.this_module</code>. Specifically, we need to grab:</p><ol><li><code>.gnu.linkonce.this_module</code> ELF section size.</li><li>The offset where the module name is stored.</li><li>The offsets for the startup and deconstruction functions.</li></ol><p>Let’s start by grabbing the <code>.gnu.linkonce.this_module</code> section size. We can once again use <code>readelf</code> to grab the information. Specifically we can use:</p><pre><code>
+$ readelf -S amd-rng.ko -W | grep linkonce_this
+
+  [Nr] Name                      Type            Address          Off    Size   ES Flg Lk Inf Al
+  ...
+  [26] .gnu.linkonce.this_module PROGBITS        0000000000000000 000900 000440 00  WA  0   0 64
+</code></pre><p>We’re interested in the hex value (0x440) in the Size column.</p><p>Next we will want to identify, where the module name offset within the <code>.gnu.linkonce.this_module</code> section. We can also use <code>readelf</code> to get that value, except this time we will manually count the offset:</p><pre><code>readelf -j .gnu.linkonce.this_module amd-rng.ko
+
+Hex dump of section &#39;.gnu.linkonce.this_module&#39;:
+ NOTE: This section has relocations against it, but these have NOT been applied to this dump.
+  0x00000000 00000000 00000000 00000000 00000000 ................
+  0x00000010 00000000 00000000 616d645f 726e6700 ........amd_rng.
+</code></pre><p>Notice that in the above result, the module name (amd_rng) starts at 0x18 and is null terminated.</p><p><strong>Note:</strong> You might remember that <code>.modinfo</code> also contained the module name. However, it is important to note that these two names are used for different operations and can be different. The <code>.modinfo</code> name is used as a tag for log messages and the <code>.gnu.linkonce.this_module</code> name is the actual name of the module and used by utilities like <code>lsmod</code>.</p><p>The final piece of information we need is the startup/deconstruction method offsets. Now these values are not hard-coded in the section header like the name, instead these values are stored as relocation entries. We can once again do that using <code>readelf</code>:</p><pre><code>$ readelf  amd-rng.ko -r 
+
+Relocation section &#39;.rela.text&#39; at offset 0x16f0 contains 15 entries:
+  Offset          Info           Type           Sym. Value    Sym. Name + Addend
+
+....
+
+Relocation section &#39;.rela.gnu.linkonce.this_module&#39; at offset 0x2068 contains 2 entries:
+  Offset          Info           Type           Sym. Value    Sym. Name + Addend
+000000000138  002c00000001 R_X86_64_64       0000000000000010 init_module + 0
+0000000003f8  002700000001 R_X86_64_64       0000000000000010 cleanup_module + 0
+</code></pre><p>Notice that there are two offsets (0x138, 0x3f8) one for the init method (<code>init_module</code>) and one for the cleanup method (<code>cleanup_module</code>).</p><p>So far we’ve collected the following information:</p><ol><li><code>.gnu.linkonce.this_module</code> ELF section size: 0x440</li><li>The offset where the module name is stored: 0x18</li><li>The offsets for the startup and deconstruction functions: 0x138, 0x3f8</li></ol><p>Let’s update our <code>ivision</code> module to integrate this new information:</p><pre><code class="language-c">#define NAME &quot;ivision&quot;
+#define VERMAGIC &quot;6.6.32 SMP preempt mod_unload &quot;
+#define GNU_LINK_SIZE 0x440
+#define GNU_LINK_NAME_OFFSET 0x18
+#define INIT_LOCATION  0x138
+#define CLEANUP_LOCATION 0x3f8
+
+char modinfo[100]  __attribute__((section(&quot;.modinfo&quot;))) = &quot;name=&quot; NAME &quot;\x00vermagic=&quot; VERMAGIC;
+
+int init(void){
+    return 0;
+}
+
+void cleanup(void){
+}
+
+int main(){
+  return 0;
+}
+
+
+struct module { 
+    char __padding[GNU_LINK_NAME_OFFSET];
+    char name [sizeof(NAME)];
+    char __padding1[INIT_LOCATION-GNU_LINK_NAME_OFFSET-sizeof(NAME)];
+    void *init;
+    char __padding2[CLEANUP_LOCATION-INIT_LOCATION-sizeof(void*)];
+    void *cleanup;
+    char __padding3[GNU_LINK_SIZE-CLEANUP_LOCATION-sizeof(void*)];
+}__attribute__((packed));
+
+struct module tmp __attribute__ ((section (&quot;.gnu.linkonce.this_module&quot;))) =
+{
+  .name = NAME,
+  .init = init,
+  .cleanup = cleanup,
+};
+</code></pre><p><strong>Note:</strong> The <code>init</code> function must return a 0 to indicate a successful <code>init</code>. The <code>cleanup</code> function should not have any return.</p><p>Let’s talk about the changes. We’ve declared a new <code>struct module</code> which contains all the <code>.gnu.linkonce.this_module</code> section information which we want to define. It also uses our offsets to make sure our data is located in the correct locations. We also made use of the <code>__attribute__((packed))</code> feature to make sure that we have full control over the padding and size of the strict. This attribute disables the alignment that the compiler would otherwise perform.</p><p>Additionally, we’ve created two new functions: <code>init</code> and <code>cleanup</code>. These will ultimately be called by our module, but for now they are empty.</p><p>Finally, we define the <code>tmp</code> variable as a new <code>struct module</code> and set up all the necessary values:</p><ul><li>Module Name</li><li>Init method</li><li>Clean up method</li></ul><p>We also use the <code>section</code> attribute to store the resulting variable in <code>.gnu.linkonce.this_module</code>. With this we’ve almost completed creating our own Linux kernel module from scratch. It would load now on an x86_64 machine, but it would not do anything.</p><h4 id="elf-section--plt-and-initplt">ELF Section — <code>.plt</code> and <code>.init.plt</code></h4><p>One of our goals was make this runnable on AArch64 devices. In order to achieve that, we need to include the <code>.plt</code> and <code>.init.plt</code> ELF section headers. Again, we’ll follow the process of extracting a Linux kernel module from the image, running readelf and copying the results. In this instance, we will use the <code>/lib/modules/6.6.32/kernel/net/802/p8022.ko</code> kernel module from the AArch64 QEMU image. First we will grab the size of the <code>.plt</code> and <code>.init.plt</code> sections:</p><pre><code>$ readelf -S  p8022.ko -W 
+There are 25 section headers, starting at offset 0x1078:
+
+Section Headers:
+  [Nr] Name              Type            Address          Off    Size   ES Flg Lk Inf Al
+  ...
+  [ 7] .plt              PROGBITS        0000000000000000 0001d4 000001 00  AX  0   0  1
+  [ 8] .init.plt         PROGBITS        0000000000000000 0001d5 000001 00   A  0   0  1
+</code></pre><p>Based on the results of the above, both section have a size of 0x1. Next, let’s check if that section contains any hard-coded values:</p><pre><code>$ readelf -j .plt -j .init.plt  p8022.ko -W 
+
+Hex dump of section &#39;.plt&#39;:
+  0x00000000 00                                  .
+
+
+Hex dump of section &#39;.init.plt&#39;:
+  0x00000000 00        
+</code></pre><p>Based on the results, it appears that the sections are empty. With this information we can add the following lines to <code>ivision.c</code> to enable it to run on AArch64.</p><pre><code class="language-c">char plt[0x000001] __attribute__ ((section (&quot;.plt&quot;))) __attribute__ ((packed)) = &quot;\x00&quot;;
+char init_plt[0x000001] __attribute__ ((section (&quot;.init.plt&quot;))) __attribute__ ((packed)) = &quot;\x00&quot;;
+</code></pre><p>Now our module, once compiled, could run on both X86_64 and AArch64 architectures. There’s just one problem, it does not do anything.</p><h2 id="calling-kernel-functions">Calling Kernel Functions</h2><p>So far, we have a kernel module, but it does not do anything. Let’s modify <code>init</code> to print <code>ivision can help with your pentesting needs</code> and cleanup to print <code>contact us at ivision.com</code>. Typically, we would import <code>printk.h</code> and then call <code>printk</code> to achieve this goal. However, we do not have access to any headers, so we have to take a different approach. We will use function pointers to call functions in the kernel. In order to do that, we’ll need to:</p><ol><li>Identify the functions available to us.</li><li>Identify their memory address.</li><li>Create a function pointer to call the function.</li></ol><p>We can solve problems 1 and 2 by taking a look at <code>/proc/kallsyms</code>. This file contains all kernel symbols, and it often contains a list of the exported functions and their memory addresses. We are primarily interested in <code>printk</code>, so let’s use look for that symbol:</p><pre><code># grep printk /proc/kallsyms
+ffffffff810c1da0 T _printk
+</code></pre><p><strong>Note:</strong> The above only functions when <code>CONFIG_KALLSYMS_ALL</code> is set to <code>y</code> and when kptr_restrict is set to 0. On real-world devices, you will likely want to run the above as root and hope that <code>CONFIG_KALLSYMS_ALL</code> is enabled. If not, you’ll likely need to find a different way to leak kernel function addresses.</p><p>You will notice that there is not a <code>printk</code> function, but there is an <code>_printk</code>. This acts just like <code>printk</code>, so we will use it instead. With the symbol identified, we can use <code>C</code>‘s function pointer syntax to call functions at a specific memory address. For <code>_printk</code>, we can create a function pointer using the following</p><pre><code class="language-c">int (*_printk)(const char *) = (void*) 0xffffffff810c1da0;
+</code></pre><p>For reference, the basic format of a function pointer is:</p><pre><code class="language-c">return_type (*function_name)(param_type_1, param_type_2, ...) = (void *) address;
+</code></pre><p>Let’s update our <code>ivision.c</code>‘s <code>init</code> and <code>cleanup</code> to call this <code>_printk</code> function:</p><pre><code class="language-c">int init(void){
+  (*_printk)(&quot;[INIT] ivision can help with your pentesting needs\n&quot;);
+   return 0;
+}
+
+void cleanup(void){
+  (*_printk)(&quot;[CLEANUP] contact us at ivision.com\n&quot;);
+}
+</code></pre><p>We have now written a Linux kernel module. Let’s talk briefly about compiling. We can compile our code into a kernel module by using <code>gcc -c ivision.c -o ivision.ko</code>. Once compiled, we can load and unload our module using <code>insmod</code> and <code>rmmod</code>. Finally, if we want to build our module for AArch64, we’ll need a bare-metal tool chain. For AArch64, we can get one from ARM <a href="https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads">here</a> and we will need to adjust the <code>.modinfo</code> and <code>.gnu.module.this_module</code> fields accordingly, but once adjusted we can build it using the toolchain’s prebuilt <code>aarch64-none-elf-gcc</code> binary. This acts just like gcc, but builds for AArch64, thus we only need to run <code>aarch64-none-elf-gcc -c ivision.c -o ivision.ko</code> to get an AArch64 kernel module.</p><p>Now we’ve got a completed kernel module and can load and unload our module:</p><pre><code>$ gcc -c ivision.c -o ivision.ko
+$ scp -O -P 2222 ivision.ko root@127.0.0.1:/tmp
+$ ssh root@127.0.0.1 -p 2222
+# insmod /tmp/ivision.ko
+# rmmod /tmp/ivision.ko
+# dmesg | grep ivision
+ivision: loading module not compiled with retpoline compiler.
+ivision: module license &#39;unspecified&#39; taints kernel.
+ivision: module license taints kernel.
+[INIT] ivision can help with your pentesting needs
+[CLEANUP] contact us at ivision.com
+</code></pre><h2 id="making-the-keydump-module-portable">Making the keydump module portable</h2><p>We are almost done here. The final task is to convert our <code>keydump.ko</code> module from the previous blog into something that is usable without Linux kernel headers. That program can be found in this blog’s <a href="/assets/postcontent/headerless_kernel_modules.tar.gz">resources</a>. We will not cover all the code, but let’s talk about some of the highlights:</p><ul><li>We had to define <code>struct key</code>. We did not have existing Linux kernel headers to link against, so we had to define our own structure. We didn’t need access to all the members of the struct, so we took a shortcut and ignored any unused members. We took a similar approach for all memory structures, which would typically be included as a header. For the example, the following struct key was created by computing the offsets based on the memory structure documented in <a href="https://elixir.bootlin.com/linux/v6.6.32/source/include/linux/key.h#L195">Linux Kernel’s source code</a>:</li></ul><pre><code>struct key {
+  unsigned long usage;
+  unsigned long serial;
+  char __padding[152];
+  char* description;
+  void* payload;
+};
+</code></pre><ul><li>The kernel module no longer uses kernel parameters, it now has to be recompiled for every key dump attempt.</li></ul><p>Once the <code>#defines</code> and function pointers are updated, we can compile it using <code>gcc -c keydump.c -o keydump.ko</code> or <code>aarch64-none-elf-gcc -c ivision.c -o ivision.ko</code> for AArch64, run it using <code>insmod keydump.ko</code>, and remove the module using <code>rmmod keydump.ko</code>. Like before, we will see the results in <code>dmesg</code>:</p><pre><code># dmesg
+USER/LOGON - KEY:63 6f 6e 74 61 63 74 20 75 73 20 61 74 20 69 76 69 73 69 6f 6e 2e 63 6f 6d                       contact us at ivision.com
+</code></pre><h2 id="running-on-real-hardware">Running on real hardware</h2><p>This Linux kernel module we wrote works well on QEMU with a mainline kernel. In practice, you might find that its difficult to just compile <code>keydump.c</code> without headers and have it run as intended. Why? Well in the real world, devices use custom kernels with custom configurations. These custom configurations probably will not stop the Linux kernel module from loading, but it will likely crash when attempting to interact with kernel memory. This is on account of the custom configurations potentially altering the data structure used by the Linux Kernel Key Retention Service. We have seen this in real world applications. Custom configurations result in changes to the underlying key structure resulting in kernel panics when invalid memory regions are read. It is a difficult problem to solve, especially when kernel headers are not present. The solution? Staring at the memory dump. The approach we have found to work best has been to:</p><ol><li>Determine the Linux kernel version being used and clone its source</li><li>Inject your own known key into the kernel keyring (ideally it should match the type of the key you want to extract)</li><li>Figure out how to get a reference to a key structure in kernel memory. We have been lucky and the <code>key_lookup</code> function was always present</li><li>Dump the memory at the given reference</li><li>Compare the Linux kernel source’s key struct to what is in the memory dump</li><li>Reconstruct the memory structure enough to recover your known key</li><li>Repeat but with your target key</li></ol><p>Hopefully, this helps if you are looking to dump keys from the Linux Kernel Key Retention service or if you’re trying to figure out how to build stand-alone Linux kernel modules. If you have any questions, feel free to contact me directly at jsotoventura at company name dot com.</p></div><footer class="wrapper post__footer"><p class="post__last-updated">This article was updated on May 19, 2025</p><div class="post__share"></div></footer><nav class="pagination"><div class="pagination__title"><span>Read other posts</span></div><div class="pagination__buttons"><a href="https://sotoventura.com/dumping-keys-from-the-linux-key-retention-service-part-1.html" class="btn previous" rel="prev" aria-label="[MISSING TRANSLATION]:  Dumping Keys From the Linux Key Retention Service — Part 1 "><span class="btn__icon">←</span> <span class="btn__text">Dumping Keys From the Linux Key Retention Service — Part 1</span> </a><a href="https://sotoventura.com/cackalackycon.html" class="btn next" rel="next" aria-label="[MISSING TRANSLATION]:  CackalackyCon 2025 "><span class="btn__text">CackalackyCon 2025</span> <span class="btn__icon">→</span></a></div></nav></article></main><footer class="footer"><div class="footer__inner"><div class="footer__copyright"><p>© 2024 Powered by Publii CMS :: <a href="https://github.com/panr/hugo-theme-terminal" target="_blank" rel="noopener">Theme</a> ported by the <a href="https://getpublii.com/customization-service/" target="_blank" rel="noopener">Publii Team</a></p></div><div class="footer__social"><a href="linkedin.com" aria-label="LinkedIn"><svg><use xlink:href="https://sotoventura.com/assets/svg/svg-map.svg#linkedin"/></svg></a></div></div></footer></div><script defer="defer" src="https://sotoventura.com/assets/js/scripts.min.js?v=c2232aa7558e9517946129d2a1b8c770"></script><script>window.publiiThemeMenuConfig={mobileMenuMode:'sidebar',animationSpeed:300,submenuWidth: 'auto',doubleClickTime:500,mobileMenuExpandableSubmenus:true,relatedContainerForOverlayMenuSelector:'.top'};</script><script>var images = document.querySelectorAll('img[loading]');
+        for (var i = 0; i < images.length; i++) {
+            if (images[i].complete) {
+                images[i].classList.add('is-loaded');
+            } else {
+                images[i].addEventListener('load', function () {
+                    this.classList.add('is-loaded');
+                }, false);
+            }
+        }</script></body></html>
